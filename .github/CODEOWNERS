@@ -1,0 +1,27 @@
+# CODEOWNERS — quem aprova mudanças críticas
+#
+# Sintaxe: <padrão>  <owners>
+# Owners precisam aprovar PR antes de merge nas pastas listadas.
+
+# Padrão: time inteiro revisa
+*                                @org/eng
+
+# Constituição e governança — apenas tech leads
+/.agent/CONSTITUTION.md           @org/tech-leads
+/.agent/rules/                    @org/tech-leads
+/.agent/hooks/                    @org/tech-leads
+/.agent/agents/                   @org/tech-leads
+/specs/adrs/                      @org/tech-leads
+
+# Contrato de API — backend + frontend leads
+/docs/api/openapi.yaml            @org/tech-leads @org/api-owners
+
+# Infra de CI
+/.github/workflows/               @org/tech-leads @org/devops
+
+# Migrations — DBA + tech leads
+/apps/api/migrations/             @org/tech-leads @org/dba
+
+# Frontend / backend — owners por área
+/apps/api/                        @org/backend
+/apps/web/                        @org/frontend

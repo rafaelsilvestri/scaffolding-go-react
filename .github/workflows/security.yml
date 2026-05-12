@@ -1,0 +1,42 @@
+name: security
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # toda segunda 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  go-vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: apps/api/go.sum
+      - run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          (cd apps/api && govulncheck ./...)
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: pnpm, cache-dependency-path: apps/web/pnpm-lock.yaml }
+      - run: cd apps/web && pnpm install --frozen-lockfile
+      - run: cd apps/web && pnpm audit --prod
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2

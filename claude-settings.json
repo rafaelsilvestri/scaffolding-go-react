@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Renomeie para .claude/settings.json. Versionada. Mudanças requerem revisão de CODEOWNER (.github/CODEOWNERS).",
+
+  "permissions": {
+    "_comment": "Lista permissiva para a maioria das tools. Hooks fazem o trabalho fino de bloqueio.",
+    "allow": [
+      "Bash",
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "MultiEdit"
+    ],
+    "deny": []
+  },
+
+  "hooks": {
+    "_comment_pretool": "Roda ANTES de cada chamada às tools listadas. Script sai com exit 2 para bloquear.",
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.agent/hooks/pre-tool-use.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+
+    "_comment_posttool": "Roda APÓS edição completar. Roda lint/format/vet específico da pasta.",
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.agent/hooks/post-tool-use.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+
+    "_comment_prompt": "Injeta contexto adicional quando o usuário envia mensagem — opcional, exemplo desativado por padrão.",
+    "UserPromptSubmit": []
+  },
+
+  "_notes": [
+    "1. Hooks são executados com o CWD do projeto.",
+    "2. $CLAUDE_PROJECT_DIR é expandido pelo Claude Code para o root do repo.",
+    "3. Timeout em segundos. Scripts longos são anti-padrão — delegue a CI.",
+    "4. Para desativar temporariamente um hook, comente o objeto inteiro — não delete a chave.",
+    "5. Settings de usuário (~/.claude/settings.json) e do projeto se mesclam. Settings de projeto vencem em conflito.",
+    "6. Após renomear: chmod +x .agent/hooks/*.sh (ou rode 'make hooks-enable')."
+  ]
+}

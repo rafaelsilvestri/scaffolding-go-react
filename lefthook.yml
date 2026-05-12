@@ -1,0 +1,116 @@
+# lefthook — git hooks gerenciados.
+#
+# Camada de defesa que roda independentemente de qual agente fez a mudança:
+#   - Pre-commit: rápido, só o que mudou (staged files)
+#   - Pre-push: testes completos, custa mais tempo
+#   - Commit-msg: convenção de mensagens
+#
+# Instale: brew install lefthook  (ou go install github.com/evilmartians/lefthook@latest)
+# Ative no repo: lefthook install
+# Bypass emergencial: LEFTHOOK=0 git commit ...
+
+pre-commit:
+  parallel: true
+  commands:
+
+    # -------- Go ----------------------------------------------------------
+    go-fmt:
+      tags: backend
+      glob: "apps/api/**/*.go"
+      run: |
+        unformatted=$(gofmt -l {staged_files})
+        if [ -n "$unformatted" ]; then
+          echo "go: arquivos não formatados:"
+          echo "$unformatted"
+          echo "rode: gofmt -w apps/api/..."
+          exit 1
+        fi
+
+    go-vet:
+      tags: backend
+      glob: "apps/api/**/*.go"
+      run: cd apps/api && go vet ./...
+
+    # -------- TypeScript / React -----------------------------------------
+    eslint:
+      tags: frontend
+      glob: "apps/web/**/*.{ts,tsx,js,jsx}"
+      run: cd apps/web && pnpm exec eslint {staged_files}
+
+    typecheck-web:
+      tags: frontend
+      glob: "apps/web/**/*.{ts,tsx}"
+      run: cd apps/web && pnpm typecheck
+
+    # -------- Contrato OpenAPI -------------------------------------------
+    spectral:
+      glob: "docs/api/openapi.yaml"
+      run: |
+        if command -v spectral >/dev/null 2>&1; then
+          spectral lint {staged_files}
+        else
+          echo "spectral não instalado — instale com: npm i -g @stoplight/spectral-cli"
+          exit 1
+        fi
+
+    # -------- Padrões proibidos em diff -----------------------------------
+    forbidden-patterns:
+      run: |
+        bad=$(git diff --cached --unified=0 -- '*.go' '*.ts' '*.tsx' '*.js' '*.jsx' '*.sql' \
+              | grep -E '^\+' \
+              | grep -vE '^\+\+\+' \
+              | grep -nE '(\beval\s*\(|dangerouslySetInnerHTML|: any\b|interface\s*\{\}|fmt\.Println\b|console\.log\b|password\s*[:=]\s*["'\'']|api_key\s*[:=]\s*["'\''])') || true
+        if [ -n "$bad" ]; then
+          echo "padrões proibidos detectados em mudanças staged:"
+          echo "$bad"
+          echo
+          echo "ver .agent/rules/99-forbidden.md"
+          exit 1
+        fi
+
+    # -------- Secrets ----------------------------------------------------
+    gitleaks:
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --no-banner --redact
+        else
+          echo "AVISO: gitleaks não instalado (recomendado: brew install gitleaks)"
+        fi
+
+    # -------- Sem TODO sem owner ------------------------------------------
+    todo-owner:
+      run: |
+        bad=$(git diff --cached --unified=0 \
+              | grep -E '^\+' \
+              | grep -vE '^\+\+\+' \
+              | grep -nE 'TODO(?!\s*\([a-zA-Z]+,\s*#[0-9]+\))') || true
+        if [ -n "$bad" ]; then
+          echo "TODO sem owner+issue detectado. Use: TODO(nome, #123): ..."
+          echo "$bad"
+          exit 1
+        fi
+
+# Pre-push: roda testes completos antes de subir
+pre-push:
+  parallel: false
+  commands:
+    test-api:
+      tags: backend
+      run: cd apps/api && go test -race -count=1 ./...
+    test-web:
+      tags: frontend
+      run: cd apps/web && pnpm test
+
+# Convenção de mensagens (Conventional Commits)
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        msg=$(head -n1 "{1}")
+        if ! echo "$msg" | grep -qE '^(feat|fix|refactor|docs|chore|test|perf|build|ci|style|revert)(\([a-z0-9_-]+\))?!?: .+'; then
+          echo "Mensagem deve seguir Conventional Commits:"
+          echo "  feat(api): adiciona endpoint /users"
+          echo "  fix(web): corrige render do HealthBadge"
+          echo "Tipo recebido: $msg"
+          exit 1
+        fi

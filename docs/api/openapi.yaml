@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: scaffolding-go-react API
+  version: 0.1.0
+  description: |
+    API de exemplo para o scaffolding Go + React. Este documento é a fonte
+    da verdade do contrato — backend e frontend se conformam a ele.
+
+    Convenções:
+    - Erros sempre seguem o schema `Error`
+    - Códigos de erro em `SCREAMING_SNAKE_CASE`
+    - Payloads de sucesso retornam direto (sem envelope `{data: ...}`)
+
+servers:
+  - url: http://localhost:8080
+    description: Desenvolvimento local
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Health check da aplicação
+      description: |
+        Retorna o status da aplicação. Sempre 200 — distinção entre `ok` e
+        `degraded` é via campo `status`. Usado por load balancers.
+      responses:
+        '200':
+          description: Status reportado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    version: 0.1.0
+                    uptime_seconds: 123
+                    checks:
+                      database: true
+                degraded:
+                  value:
+                    status: degraded
+                    version: 0.1.0
+                    uptime_seconds: 123
+                    checks:
+                      database: false
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status, version, uptime_seconds, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          description: Status agregado da aplicação
+        version:
+          type: string
+          example: 0.1.0
+        uptime_seconds:
+          type: integer
+          minimum: 0
+        checks:
+          type: object
+          required: [database]
+          properties:
+            database:
+              type: boolean
+              description: True se ping no DB respondeu < 100ms
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Código estável em SCREAMING_SNAKE_CASE
+          example: VALIDATION_FAILED
+        message:
+          type: string
+          description: Mensagem legível por humano (não estável; use `code` para lógica)
+        details:
+          type: object
+          additionalProperties: true
+          description: Detalhes adicionais (ex.: erros de validação por campo)
+        request_id:
+          type: string
+          description: ID da requisição para correlação em logs

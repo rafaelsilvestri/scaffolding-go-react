@@ -1,0 +1,22 @@
+extends:
+  - "spectral:oas"
+
+rules:
+  # Reforça regras adicionais específicas do projeto.
+  operation-operationId: error
+  operation-description: warn
+  operation-tag-defined: warn
+  operation-success-response: error
+  no-$ref-siblings: error
+  oas3-schema: error
+
+  # Códigos de erro em SCREAMING_SNAKE_CASE (ver ADR-0002).
+  error-code-format:
+    description: "Códigos em components/schemas/Error devem ser SCREAMING_SNAKE_CASE."
+    severity: warn
+    given: "$.components.schemas.Error.properties.code"
+    then:
+      field: example
+      function: pattern
+      functionOptions:
+        match: "^[A-Z][A-Z0-9_]+$"

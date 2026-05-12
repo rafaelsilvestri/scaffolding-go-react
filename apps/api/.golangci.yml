@@ -1,0 +1,54 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - gosec
+    - revive
+    - misspell
+    - gofumpt
+    - goimports
+    - gocritic
+    - prealloc
+    - unconvert
+
+linters-settings:
+  govet:
+    enable-all: true
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+  goimports:
+    local-prefixes: github.com/example/scaffolding
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: var-naming
+      - name: indent-error-flow
+      - name: error-return
+      - name: error-naming
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+  max-same-issues: 0

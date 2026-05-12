@@ -1,0 +1,30 @@
+# --- gerais ---
+.DS_Store
+*.log
+*.swp
+.env
+.env.*.local
+*.local.*
+
+# --- Go ---
+apps/api/bin/
+apps/api/coverage.out
+apps/api/coverage.html
+
+# --- Node ---
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+apps/web/coverage/
+apps/web/playwright-report/
+apps/web/test-results/
+
+# --- IDE ---
+.vscode/
+.idea/
+
+# --- Generated (mantenha apenas o necessário rastreado) ---
+apps/api/internal/storage/queries/
+
+# --- agente ---
+.agent/cache/

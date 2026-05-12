@@ -1,0 +1,34 @@
+{
+  "_comment": "Renomeie para .mcp.json. MCPs versionados no repo. Comece com poucos. Adicione apenas quando uma tarefa real exigir. Ver §7 do relatório.",
+  "mcpServers": {
+    "filesystem": {
+      "_comment": "Acesso a arquivos do projeto. Útil para leitura ampla pelo agente.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "scope": "project"
+    },
+    "git": {
+      "_comment": "Operações git de leitura. Operações de escrita requerem confirmação.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-git", "."],
+      "scope": "project"
+    }
+  },
+  "_disabled_examples": {
+    "_comment": "MCPs candidatos quando a dor real aparecer. NÃO ative todos.",
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"]
+    },
+    "sentry": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sentry"],
+      "env": { "SENTRY_AUTH_TOKEN": "${SENTRY_AUTH_TOKEN}" }
+    }
+  }
+}
