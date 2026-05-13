@@ -39,15 +39,18 @@ Aplicação web de exemplo que demonstra Spec-Driven Development com agentes de 
 2. **Plan mode** antes de editar mais de um arquivo
 3. **Atualizar OpenAPI primeiro** quando mudar superfície de API
 4. **Testes acompanham o commit** (mesmo PR) — não há "testes na próxima sprint"
-5. **Subagent `spec-verifier`** roda antes de abrir PR
+5. **Ciclo de QA** após implementação: skill `qa-cycle` orquestra `test-planner` → `test-runner` → `bug-reporter` → `bug-fixer`. Output em `specs/<id>-<slug>/qa/`. **Disparo automático**: o hook PostToolUse detecta quando `specs/<id>/tasks.md` fica com todos os checkboxes marcados e dispara um nudge obrigando o agente a invocar `qa-cycle` antes de qualquer commit/push. Para pular em casos raros (ex.: spike sem testes, mudança apenas de docs), crie `specs/<id>/qa/.skip-qa-cycle` com a justificativa textual.
+6. **Subagent `spec-verifier`** roda antes de abrir PR
 
 ## Onde encontrar
 
 - Specs por feature: `specs/<id>-<slug>/`
+- Artefatos de QA por feature: `specs/<id>-<slug>/qa/` (test-plan, test-results, bug-report, fix-log)
 - ADRs: `specs/adrs/`
 - Glossário de domínio: `docs/domain/glossary.md`
 - Padrões de código: `.agent/rules/`
-- Procedimentos: `.agent/skills/`
+- Procedimentos: `.agent/skills/` (inclui `qa-cycle` para o loop fechado de validação)
+- Subagents: `.agent/agents/` — `reviewer`, `spec-verifier`, `security-auditor`, `test-planner`, `test-runner`, `bug-reporter`, `bug-fixer`
 
 ## O que evitar
 

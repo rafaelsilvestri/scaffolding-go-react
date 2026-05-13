@@ -104,4 +104,57 @@ if [[ "$file_path" == *"/migrations/"* ]]; then
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# QA cycle trigger — detecta fim de implementação de spec
+#
+# Quando specs/<id>-<slug>/tasks.md é editado e fica com todos os checkboxes
+# marcados, dispara nudge para o agente rodar a skill `qa-cycle`.
+#
+# Skip condições:
+#   - Já existe qa/test-plan.md (ciclo em curso ou concluído)
+#   - tasks.md sem nenhum checkbox (template vazio)
+#   - Algum checkbox ainda aberto (- [ ])
+# ---------------------------------------------------------------------------
+if [[ "$file_path" =~ /specs/([^/]+)/tasks\.md$ ]]; then
+    spec_dir=$(dirname "$file_path")
+    spec_id=$(basename "$spec_dir")
+
+    # Conta checkboxes — só linhas começando com "- [" para evitar falsos positivos
+    closed_count=$(grep -cE '^[[:space:]]*-[[:space:]]+\[[xX]\]' "$file_path" || true)
+    open_count=$(grep -cE '^[[:space:]]*-[[:space:]]+\[[[:space:]]\]' "$file_path" || true)
+
+    if [[ "$open_count" -eq 0 && "$closed_count" -gt 0 ]]; then
+        # Opt-out explícito (ver CONSTITUTION § workflow item 5)
+        if [[ -f "$spec_dir/qa/.skip-qa-cycle" ]]; then
+            printf 'post-tool-use: QA cycle pulado para %s (.skip-qa-cycle presente).\n' "$spec_id" >&2
+            exit 0
+        fi
+
+        # Tudo concluído. Verifica se o ciclo já rodou.
+        if [[ ! -f "$spec_dir/qa/test-plan.md" ]]; then
+            cat >&2 <<EOF
+[QA-CYCLE-TRIGGER] Implementação detectada como completa.
+
+  spec: $spec_id
+  arquivo: $file_path
+  tarefas concluídas: $closed_count
+  tarefas pendentes: 0
+  qa/test-plan.md: ausente
+
+Próximo passo OBRIGATÓRIO (CONSTITUTION §workflow item 5):
+
+  Invoque a skill \`qa-cycle\` com SPEC_ID=$spec_id
+
+Isto orquestra: test-planner → test-runner → bug-reporter → bug-fixer.
+Não faça commit ou push até o ciclo fechar com ALL_PASS ou bugs explicitamente
+escalados. Para pular este trigger (raro, exige justificativa no commit), crie
+manualmente $spec_dir/qa/.skip-qa-cycle com a razão.
+EOF
+            # exit 2: convenção deste repo para que o agente leia a mensagem
+            # e reaja. Não desfaz a edição.
+            exit 2
+        fi
+    fi
+fi
+
 exit 0
