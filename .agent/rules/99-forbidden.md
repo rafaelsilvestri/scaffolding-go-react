@@ -1,49 +1,49 @@
-# 99 — Ações proibidas
+# 99 — Forbidden Actions
 
-> Lista canônica do que o agente **nunca** faz neste repo. O hook `pre-tool-use.sh` força os itens críticos.
+> Canonical list of what the agent **never** does in this repo. The `pre-tool-use.sh` hook enforces critical items.
 
-## Comandos jamais executar
+## Commands never to run
 
-- `rm -rf` em qualquer caminho fora de `dist/`, `build/`, `node_modules/`, `.next/`, `coverage/`, `/tmp/`
-- `DROP TABLE`, `TRUNCATE`, `DROP DATABASE` em qualquer banco que não termine em `_test`
-- `git push --force` ou `git push -f` em `main`, `develop`, `release/*`
-- `git reset --hard` em branch que não é a do agente (`agent/*`)
-- `npm publish`, `pnpm publish`, `goreleaser release` — releases são **só** via GitHub Actions
-- `chmod 777` em qualquer arquivo
-- `curl ... | sh` ou `wget ... | bash` — instale dependências via `package.json`/`go.mod`
-- `sudo` em qualquer contexto local
+- `rm -rf` on any path outside `dist/`, `build/`, `node_modules/`, `.next/`, `coverage/`, `/tmp/`
+- `DROP TABLE`, `TRUNCATE`, `DROP DATABASE` in any database that does not end in `_test`
+- `git push --force` or `git push -f` on `main`, `develop`, `release/*`
+- `git reset --hard` on a branch that is not the agent's branch (`agent/*`)
+- `npm publish`, `pnpm publish`, `goreleaser release` — releases are **only** via GitHub Actions
+- `chmod 777` on any file
+- `curl ... | sh` or `wget ... | bash` — install dependencies via `package.json`/`go.mod`
+- `sudo` in any local context
 
-## Padrões jamais introduzir no código
+## Patterns never to introduce in code
 
-- `eval()` em JS/TS, `os/exec` com input do usuário em Go
-- Concatenação de strings em SQL — sempre parametrize via sqlc
-- `dangerouslySetInnerHTML` sem sanitização (DOMPurify) explícita
-- `process.env.X` direto em código de aplicação — passe por `internal/config/` ou `import.meta.env` validado
-- `any` em TypeScript
-- `interface{}` ou `any` em Go fora de plumbing genuíno
-- `panic()` em Go fora de `main` ou inicialização não-recuperável
-- Hardcoded URLs de produção, secrets, tokens
-- Arquivos `*.local.*` versionados (esses devem ir para `.gitignore`)
+- `eval()` in JS/TS, `os/exec` with user input in Go
+- String concatenation in SQL — always parameterize via sqlc
+- `dangerouslySetInnerHTML` without explicit sanitization (DOMPurify)
+- Direct `process.env.X` in application code — route through `internal/config/` or validated `import.meta.env`
+- `any` in TypeScript
+- `interface{}` or `any` in Go outside genuine plumbing
+- `panic()` in Go outside `main` or unrecoverable initialization
+- Hardcoded production URLs, secrets, tokens
+- Versioned `*.local.*` files (these must go to `.gitignore`)
 
-## Sempre confirmar com o humano antes de
+## Always confirm with the human before
 
-- Modificar `infrastructure/`, `terraform/`, ou qualquer pasta com config de cloud
-- Rodar migrations em qualquer ambiente que não seja local
-- Adicionar nova dependência a `go.mod` ou `package.json` — explicar **por quê** no PR
-- Mudanças que alterem `docs/api/openapi.yaml` retirando campos (breaking change)
-- Renomear ou deletar arquivos em `apps/api/internal/domain/` (regras de negócio)
-- Mudanças em `.agent/CONSTITUTION.md` ou em qualquer ADR
-- Operações git que reescrevam histórico (`rebase -i`, `filter-branch`, `commit --amend` em commit já pushed)
-- Mudanças em `.github/workflows/` que removam steps de validação
-- Acesso a serviços externos não declarados em `.mcp.json`
+- Modifying `infrastructure/`, `terraform/`, or any folder with cloud config
+- Running migrations in any environment other than local
+- Adding a new dependency to `go.mod` or `package.json` — explain **why** in the PR
+- Changes that alter `docs/api/openapi.yaml` by removing fields (breaking change)
+- Renaming or deleting files in `apps/api/internal/domain/` (business rules)
+- Changes to `.agent/CONSTITUTION.md` or any ADR
+- Git operations that rewrite history (`rebase -i`, `filter-branch`, `commit --amend` on an already pushed commit)
+- Changes in `.github/workflows/` that remove validation steps
+- Accessing external services not declared in `.mcp.json`
 
-## Caminho ascendente
+## Escalation path
 
-Se uma regra acima entra em conflito com uma necessidade real:
+If a rule above conflicts with a real need:
 
-1. Pare. Explique o conflito ao humano em prosa.
-2. Proponha alternativas.
-3. Aguarde decisão explícita no chat.
-4. Se aprovado, registre em ADR antes de executar.
+1. Stop. Explain the conflict to the human in prose.
+2. Propose alternatives.
+3. Wait for an explicit decision in chat.
+4. If approved, record it in an ADR before executing.
 
-> A regra é: na dúvida, **não execute**. Pergunte.
+> The rule is: when in doubt, **do not execute**. Ask.

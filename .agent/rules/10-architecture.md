@@ -1,85 +1,85 @@
-# 10 — Arquitetura
+# 10 — Architecture
 
-## Topologia do monorepo
+## Monorepo topology
 
 ```
 apps/
-├── api/    # Go: backend HTTP, fonte da verdade do domínio
-└── web/    # React: cliente que consome a API REST
+├── api/    # Go: HTTP backend, domain source of truth
+└── web/    # React: client that consumes the REST API
 
-docs/api/openapi.yaml    # Contrato. Os dois lados se conformam a ele.
+docs/api/openapi.yaml    # Contract. Both sides conform to it.
 ```
 
-> O contrato OpenAPI é o **único acoplamento permitido** entre `apps/api` e `apps/web`. Não importe nada de um app no outro.
+> The OpenAPI contract is the **only allowed coupling** between `apps/api` and `apps/web`. Do not import anything from one app into the other.
 
 ## Backend (apps/api)
 
-Camadas, de fora para dentro:
+Layers, outside in:
 
 ```
 cmd/server/         # Entry point. Wire deps, start server.
 internal/
-├── http/           # Handlers, middleware, routing. Sem regra de negócio.
+├── http/           # Handlers, middleware, routing. No business rules.
 │   ├── handlers/
 │   ├── middleware/
-│   └── response/   # Envelope Result<T, E>, helpers de status code
-├── domain/         # Entidades + regras de negócio puras (sem I/O)
-├── service/        # Use cases. Orquestra domain + storage.
-├── storage/        # Persistência (sqlc-generated + repos)
-└── config/         # Carregamento de env vars + validação
+│   └── response/   # Result<T, E> envelope, status code helpers
+├── domain/         # Pure entities + business rules (no I/O)
+├── service/        # Use cases. Orchestrates domain + storage.
+├── storage/        # Persistence (sqlc-generated + repos)
+└── config/         # Env var loading + validation
 ```
 
-**Regras**:
+**Rules**:
 
-1. `domain/` não importa de `http/`, `storage/` ou `service/`
-2. `service/` importa `domain/` e `storage/`. Não importa `http/`.
-3. `http/` importa `service/`. Não conhece SQL.
-4. Dependências fluem **para dentro**. Nunca o inverso.
-5. Cada handler tem teste de integração (httptest) cobrindo: caso feliz, validação, erro do serviço.
+1. `domain/` does not import from `http/`, `storage/`, or `service/`
+2. `service/` imports `domain/` and `storage/`. It does not import `http/`.
+3. `http/` imports `service/`. It does not know SQL.
+4. Dependencies flow **inward**. Never the reverse.
+5. Every handler has an integration test (httptest) covering: happy path, validation, service error.
 
 ## Frontend (apps/web)
 
 ```
 src/
-├── api/            # Cliente HTTP gerado a partir do OpenAPI + hooks de query
-├── components/     # Componentes reutilizáveis, sem fetch direto
-├── features/       # Pastas por feature de produto (login, dashboard, etc.)
+├── api/            # HTTP client generated from OpenAPI + query hooks
+├── components/     # Reusable components, no direct fetch
+├── features/       # Folders by product feature (login, dashboard, etc.)
 │   └── <feature>/
 │       ├── components/
 │       ├── hooks/
 │       └── routes.tsx
-├── lib/            # Utilities puras (formatters, validators)
+├── lib/            # Pure utilities (formatters, validators)
 └── App.tsx
 ```
 
-**Regras**:
+**Rules**:
 
-1. Componentes em `components/` não fazem fetch — recebem dados via props
-2. Data fetching apenas em hooks dentro de `features/<f>/hooks/` ou `api/`
-3. Estado de servidor: TanStack Query. Estado local: `useState`/`useReducer`. Nada de Redux.
-4. Roteamento: `react-router` ou `tanstack-router` — escolha definida no ADR-0002
+1. Components in `components/` do not fetch — they receive data via props
+2. Data fetching only in hooks inside `features/<f>/hooks/` or `api/`
+3. Server state: TanStack Query. Local state: `useState`/`useReducer`. No Redux.
+4. Routing: `react-router` or `tanstack-router` — choice defined in ADR-0002
 
-## Contrato e geração de tipos
+## Contract and type generation
 
 - Source of truth: `docs/api/openapi.yaml`
-- Backend gera handlers stubs com `oapi-codegen` (opcional)
-- Frontend gera types e funções com `openapi-typescript` + `openapi-fetch`
-- CI valida: spec → tipos gerados → código compila → testes passam
+- Backend generates handler stubs with `oapi-codegen` (optional)
+- Frontend generates types and functions with `openapi-typescript` + `openapi-fetch`
+- CI validates: spec → generated types → code compiles → tests pass
 
 ## Migrations
 
-- Pasta: `apps/api/migrations/`
-- Forward-only. Nunca editar uma migration aplicada — crie uma nova.
-- Nome: `YYYYMMDDHHMM_<descricao>.up.sql` e `.down.sql`
-- `down.sql` existe para emergências locais. Em produção, fazemos forward-fix.
+- Folder: `apps/api/migrations/`
+- Forward-only. Never edit an applied migration — create a new one.
+- Name: `YYYYMMDDHHMM_<description>.up.sql` and `.down.sql`
+- `down.sql` exists for local emergencies. In production, we forward-fix.
 
-## Observabilidade
+## Observability
 
-- Logs estruturados (`slog` em Go) com correlação por request ID
-- Métricas via `/metrics` (Prometheus) — middleware no router
-- Traces via OpenTelemetry quando habilitado por env var
+- Structured logs (`slog` in Go) with correlation by request ID
+- Metrics via `/metrics` (Prometheus) — middleware in the router
+- Traces via OpenTelemetry when enabled by env var
 
 ## Performance
 
-- Endpoints REST p95 < 200ms para operações de leitura
-- N+1 é bug, não otimização — pegue em code review
+- REST endpoints p95 < 200ms for read operations
+- N+1 is a bug, not an optimization — catch it in code review

@@ -1,71 +1,71 @@
 # 30 — Testing
 
-> Testes acompanham o commit. Sem exceções. PR sem teste = PR rejeitado pelo CI.
+> Tests ship with the commit. No exceptions. PR without tests = PR rejected by CI.
 
-## Pirâmide
+## Pyramid
 
-| Nível | Quem testa | Onde | Quanto |
+| Level | What it tests | Where | Amount |
 |---|---|---|---|
-| Unit | funções puras de domínio | `*_test.go` ao lado, `*.test.ts` ao lado | 70% |
-| Integration | handler + db real ou httpmock | `internal/http/handlers/*_test.go`, `apps/web/src/**/*.integration.test.ts` | 25% |
-| E2E | fluxo crítico (login, checkout) | `e2e/` (Playwright) | 5% |
+| Unit | pure domain functions | adjacent `*_test.go`, adjacent `*.test.ts` | 70% |
+| Integration | handler + real db or httpmock | `internal/http/handlers/*_test.go`, `apps/web/src/**/*.integration.test.ts` | 25% |
+| E2E | critical flow (login, checkout) | `e2e/` (Playwright) | 5% |
 
 ## Backend (Go)
 
-### Convenções
+### Conventions
 
-- Mesma pasta do código (`pkg/foo/bar.go` + `pkg/foo/bar_test.go`)
-- Nome do teste descreve **comportamento**:
+- Same folder as the code (`pkg/foo/bar.go` + `pkg/foo/bar_test.go`)
+- Test name describes **behavior**:
   - ✅ `TestCreateUser_RejectsDuplicateEmail`
   - ❌ `TestCreateUser1`
-- `t.Run("subcase")` para variações. Tabela quando há muitas.
-- `httptest` para handlers; banco real (com `_test` suffix) para repos.
+- Use `t.Run("subcase")` for variations. Table tests when there are many.
+- `httptest` for handlers; real database (with `_test` suffix) for repos.
 
 ### Mocks
 
-- Interfaces pequenas + implementação fake escrita à mão > mocks gerados
-- Se uma interface tem mais de 5 métodos, ela está grande demais para ser mockada com confiança
+- Small interfaces + hand-written fake implementation > generated mocks
+- If an interface has more than 5 methods, it is too large to mock confidently
 
-### Determinismo
+### Determinism
 
-- Sem `time.Now()` direto — injete `Clock` interface
-- Sem random direto — injete `IDGen` interface
-- Banco de teste limpa antes de cada teste (`TRUNCATE` em transação revertida)
+- No direct `time.Now()` — inject a `Clock` interface
+- No direct random — inject an `IDGen` interface
+- Test database cleans before each test (`TRUNCATE` in a rolled-back transaction)
 
 ## Frontend (React)
 
 ### Stack
 
-- **Vitest** para unit + component
-- **React Testing Library** — testar comportamento do usuário, não implementação
-- **MSW** (Mock Service Worker) para mockar a API REST
-- **Playwright** para E2E
+- **Vitest** for unit + component
+- **React Testing Library** — test user behavior, not implementation
+- **MSW** (Mock Service Worker) to mock the REST API
+- **Playwright** for E2E
 
-### Princípios
+### Principles
 
-- ✅ `screen.getByRole('button', { name: /enviar/i })`
-- ❌ `screen.getByTestId('submit-button')` (último recurso)
-- Não teste detalhes de hooks internos. Teste o que o usuário vê.
-- Use `userEvent` (não `fireEvent`) — simula interação real
+- ✅ `screen.getByRole('button', { name: /send/i })`
+- ❌ `screen.getByTestId('submit-button')` (last resort)
+- Do not test internal hook details. Test what the user sees.
+- Use `userEvent` (not `fireEvent`) — simulates real interaction
 
-## Cobertura
+## Coverage
 
-- Não trate cobertura como métrica de qualidade — trate como sanity check
-- Threshold mínimo: 70% em `domain/` e `service/` (Go), 60% global no frontend
-- Caminhos de erro **devem** ser testados — bug que vaza para produção quase sempre é caminho não-feliz não testado
+- Do not treat coverage as a quality metric — treat it as a sanity check
+- Minimum threshold: 70% in `domain/` and `service/` (Go), 60% global in the frontend
+- Error paths **must** be tested — bugs that leak to production are almost always untested unhappy paths
 
-## Spec ↔ Teste
+## Spec ↔ Test
 
-- Cada item em `## Critérios de aceitação` da spec vira **pelo menos** um teste
-- Convenção: nome do teste cita o ID do critério (`TestUserSignup_AC1_ValidatesEmail`)
+- Every item in `## Acceptance Criteria` of the spec becomes **at least** one test
+- Convention: the test name cites the criterion ID (`TestUserSignup_AC1_ValidatesEmail`)
 
-## Quando NÃO testar
+## When NOT to test
 
-- Boilerplate gerado (sqlc, openapi types) — confie no gerador
-- Wiring trivial em `cmd/server/main.go`
-- Mocks são código também — não teste mocks
+- Generated boilerplate (sqlc, OpenAPI types) — trust the generator
+- Trivial wiring in `cmd/server/main.go`
+- Mocks are code too — do not test mocks
 
 ## Performance
 
-- Test suite local < 60s. Se passou disso, parta paralelizando ou movendo para integration
-- `go test -race ./...` em CI sempre
+- Local test suite < 60s. If it exceeds that, split by parallelizing or moving to integration
+- `go test -race ./...` always in CI

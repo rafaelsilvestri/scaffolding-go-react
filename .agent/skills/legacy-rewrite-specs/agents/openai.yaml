@@ -1,0 +1,7 @@
+interface:
+  display_name: "Legacy Rewrite Specs"
+  short_description: "Analyze legacy apps into reviewed rewrite specs"
+  default_prompt: "Use $legacy-rewrite-specs to analyze my legacy repository and prepare reviewed rewrite specs for the new project."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,68 +1,67 @@
 ---
 name: qa-cycle
-description: Use quando o usuário pedir para validar uma feature, "rodar QA",
-  "fechar o ciclo", "testar e corrigir", ou após implementar uma feature
-  nova. Orquestra os 4 subagents do ciclo (test-planner → test-runner →
-  bug-reporter → bug-fixer) em sequência, com gates entre cada fase.
-  Tudo escrito em specs/<id>-<slug>/qa/.
+description: Use when the user asks to validate a feature, "run QA", "close
+  the cycle", "test and fix", or after implementing a new feature.
+  Orchestrates the 4 subagents in the cycle (test-planner → test-runner →
+  bug-reporter → bug-fixer) in sequence, with gates between each phase.
+  Everything is written to specs/<id>-<slug>/qa/.
 tools: [view, bash_tool, grep_tool, glob_tool]
 ---
 
-# Ciclo de QA neste projeto
+# QA cycle in this project
 
-Procedimento canônico para validar uma feature após implementação. Fecha o
-loop: **plano de testes → execução → relatório de bugs → correção → PR**.
+Canonical procedure for validating a feature after implementation. Closes the
+loop: **test plan → execution → bug report → fix → PR**.
 
-## Pré-condições
+## Preconditions
 
-- Existe `specs/<id>-<slug>/spec.md` (a feature está especificada)
-- A feature foi implementada (código de produção existe)
-- `make setup` foi executado pelo menos uma vez
-- Banco de teste local disponível
-- Working tree limpa (`git status` sem mudanças não commitadas)
+- `specs/<id>-<slug>/spec.md` exists (the feature is specified)
+- The feature has been implemented (production code exists)
+- `make setup` has been run at least once
+- Local test database is available
+- Clean working tree (`git status` has no uncommitted changes)
 
-## Disparo automático
+## Automatic trigger
 
-Esta skill é invocada automaticamente pelo hook `.agent/hooks/post-tool-use.sh`
-quando `specs/<id>/tasks.md` é editado de forma que **todos** os checkboxes
-ficam marcados (`- [x]`) e `specs/<id>/qa/test-plan.md` ainda não existe.
+This skill is invoked automatically by the `.agent/hooks/post-tool-use.sh` hook
+when `specs/<id>/tasks.md` is edited so that **all** checkboxes are checked
+(`- [x]`) and `specs/<id>/qa/test-plan.md` does not yet exist.
 
-O hook emite uma mensagem com prefixo `[QA-CYCLE-TRIGGER]` em stderr e usa
-`exit 2` para garantir que o agente leia e reaja. Não é falha de edição —
-é o sinal de que a implementação fechou e o ciclo precisa rodar antes de
-qualquer commit/push.
+The hook emits a message with the `[QA-CYCLE-TRIGGER]` prefix to stderr and uses
+`exit 2` to ensure the agent reads and reacts. This is not an edit failure —
+it is the signal that implementation is complete and the cycle must run before
+any commit/push.
 
-### Opt-out (raro)
+### Opt-out (rare)
 
-Se a feature legitimamente não precisa do ciclo (ex.: spike, mudança apenas
-de docs, refator puro sem mudança de comportamento testável), crie:
+If the feature legitimately does not need the cycle (e.g., spike, docs-only
+change, pure refactor without testable behavior change), create:
 
 ```bash
 mkdir -p specs/<id>-<slug>/qa
-echo "razão: <justificativa em uma linha>" > specs/<id>-<slug>/qa/.skip-qa-cycle
+echo "reason: <one-line justification>" > specs/<id>-<slug>/qa/.skip-qa-cycle
 ```
 
-O hook detecta o arquivo, registra a justificativa em stderr e libera o
-agente. Use com parcimônia — a justificativa fica versionada e revisores
-veem.
+The hook detects the file, records the justification in stderr, and releases
+the agent. Use sparingly — the justification is versioned and reviewers see it.
 
 ## Inputs
 
-- `SPEC_ID`: ID da feature (ex.: `0001-health-check`)
-- `BRANCH`: branch que implementa (default: branch atual)
-- `MIN_SEVERITY` (opcional): piso para o bug-fixer (`critical|high|medium|low`). Default: `low`.
+- `SPEC_ID`: feature ID (e.g., `0001-health-check`)
+- `BRANCH`: implementing branch (default: current branch)
+- `MIN_SEVERITY` (optional): floor for the bug-fixer (`critical|high|medium|low`). Default: `low`.
 
-## Passo a passo
+## Step by step
 
 ### 0. Sanity check
 
 ```bash
-test -d specs/$SPEC_ID || { echo "Spec não encontrada"; exit 1; }
-git status --porcelain || { echo "Working tree suja"; exit 1; }
+test -d specs/$SPEC_ID || { echo "Spec not found"; exit 1; }
+git status --porcelain || { echo "Dirty working tree"; exit 1; }
 mkdir -p specs/$SPEC_ID/qa/logs
 ```
 
-### 1. Planejar — `test-planner`
+### 1. Plan — `test-planner`
 
 Subagent: `test-planner`
 
@@ -70,32 +69,32 @@ Inputs:
 - `SPEC_ID`
 - `BRANCH`
 
-Output esperado: `specs/$SPEC_ID/qa/test-plan.md`
+Expected output: `specs/$SPEC_ID/qa/test-plan.md`
 
-Gate de avanço:
-- Existe o arquivo
-- Veredito = `PLAN_READY` **ou** `PLAN_HAS_GAPS` (gaps **não** bloqueiam, são informativos)
+Advance gate:
+- File exists
+- Verdict = `PLAN_READY` **or** `PLAN_HAS_GAPS` (gaps **do not** block; they are informative)
 
-Se gaps detectados: mostre o bloco `## Gaps detectados na spec` ao humano e
-**pergunte** se quer continuar mesmo assim ou pausar para atualizar a spec.
+If gaps are detected: show the `## Spec gaps detected` block to the human and
+**ask** whether to continue anyway or pause to update the spec.
 
-### 2. Executar — `test-runner`
+### 2. Execute — `test-runner`
 
 Subagent: `test-runner`
 
 Inputs:
 - `SPEC_ID`
 - `BRANCH`
-- `LEVELS` (default: todos — unit, integration, contract, e2e, security)
+- `LEVELS` (default: all — unit, integration, contract, e2e, security)
 
-Output esperado: `specs/$SPEC_ID/qa/test-results.md` + logs em `qa/logs/`
+Expected output: `specs/$SPEC_ID/qa/test-results.md` + logs in `qa/logs/`
 
-Gate de avanço:
-- Veredito = `ALL_PASS` → **encerre o ciclo aqui**. Não invoque bug-reporter.
-- Veredito = `FAILURES_DETECTED` → siga para passo 3.
-- Veredito = `EXECUTION_ERROR` → **pare e escale**. Não é bug de feature, é build quebrado.
+Advance gate:
+- Verdict = `ALL_PASS` → **end the cycle here**. Do not invoke bug-reporter.
+- Verdict = `FAILURES_DETECTED` → proceed to step 3.
+- Verdict = `EXECUTION_ERROR` → **stop and escalate**. This is not a feature bug; it is a broken build.
 
-### 3. Reportar — `bug-reporter`
+### 3. Report — `bug-reporter`
 
 Subagent: `bug-reporter`
 
@@ -103,34 +102,34 @@ Inputs:
 - `SPEC_ID`
 - `BRANCH`
 
-Output esperado: `specs/$SPEC_ID/qa/bug-report.md`
+Expected output: `specs/$SPEC_ID/qa/bug-report.md`
 
-Gate de avanço:
-- Veredito = `NO_BUGS` → cenário anômalo (test-runner viu falhas mas reporter não): pare e escale.
-- Veredito = `BUGS_TO_FIX` → siga para passo 4.
-- Veredito = `ESCALATE_TO_HUMAN` → pare. Mostre o relatório ao humano.
+Advance gate:
+- Verdict = `NO_BUGS` → anomalous scenario (test-runner saw failures but reporter did not): stop and escalate.
+- Verdict = `BUGS_TO_FIX` → proceed to step 4.
+- Verdict = `ESCALATE_TO_HUMAN` → stop. Show the report to the human.
 
-### 4. Corrigir — `bug-fixer`
+### 4. Fix — `bug-fixer`
 
 Subagent: `bug-fixer`
 
 Inputs:
 - `SPEC_ID`
 - `BRANCH`
-- `MIN_SEVERITY` (do input do ciclo)
+- `MIN_SEVERITY` (from cycle input)
 
-Output esperado: `specs/$SPEC_ID/qa/fix-log.md` + PR aberto
+Expected output: `specs/$SPEC_ID/qa/fix-log.md` + open PR
 
-Gate de avanço:
-- Se algum bug foi marcado `ESCALATED` ou `ATTEMPTED_FAILED`: re-rode passos 2–4 **no máximo 2 vezes a mais** (total 3 iterações). Se ainda há bugs não corrigidos após 3 ciclos, pare e escale ao humano com o `fix-log.md` consolidado.
+Advance gate:
+- If any bug was marked `ESCALATED` or `ATTEMPTED_FAILED`: rerun steps 2–4 **at most 2 more times** (3 total iterations). If unresolved bugs remain after 3 cycles, stop and escalate to the human with the consolidated `fix-log.md`.
 
-### 5. Re-verificar — `test-runner` novamente
+### 5. Re-verify — `test-runner` again
 
-Re-execute o passo 2 contra a branch de fix. Espere:
-- `ALL_PASS` → ciclo fechado
-- Falhas remanescentes → todas devem ser **as mesmas** que o `bug-fixer` marcou como escaladas. Se aparecem **novas** falhas, é regressão introduzida pelo fix — pare e escale.
+Rerun step 2 against the fix branch. Expect:
+- `ALL_PASS` → cycle closed
+- Remaining failures → all must be **the same** failures the `bug-fixer` marked as escalated. If **new** failures appear, the fix introduced a regression — stop and escalate.
 
-### 6. Revisar — `reviewer` (opcional, mas recomendado)
+### 6. Review — `reviewer` (optional, but recommended)
 
 Subagent: `reviewer`
 
@@ -139,18 +138,17 @@ Inputs:
 - `PR_HEAD`
 - `SPEC_PATH=specs/$SPEC_ID`
 
-Gera review do PR antes do humano olhar.
+Generates a PR review before the human looks at it.
 
-### 7. Verificação cruzada — `spec-verifier` (recomendado)
+### 7. Cross-check — `spec-verifier` (recommended)
 
 Subagent: `spec-verifier`
 
-Confirma que o que ficou no branch **conforme a spec** (sem feature creep e
-sem item da spec sem cobertura).
+Confirms that what remains on the branch **conforms to the spec** (no feature creep and no uncovered spec item).
 
-## Estrutura final de arquivos
+## Final file structure
 
-Após um ciclo completo:
+After a full cycle:
 
 ```
 specs/<id>-<slug>/
@@ -158,10 +156,10 @@ specs/<id>-<slug>/
 ├── plan.md
 ├── tasks.md
 └── qa/
-    ├── test-plan.md       # do test-planner
-    ├── test-results.md    # do test-runner
-    ├── bug-report.md      # do bug-reporter
-    ├── fix-log.md         # do bug-fixer
+    ├── test-plan.md       # from test-planner
+    ├── test-results.md    # from test-runner
+    ├── bug-report.md      # from bug-reporter
+    ├── fix-log.md         # from bug-fixer
     └── logs/
         ├── lint.log
         ├── unit.log
@@ -171,10 +169,10 @@ specs/<id>-<slug>/
         └── e2e.log
 ```
 
-## Diagrama do fluxo
+## Flow diagram
 
 ```
-[implementação pronta]
+[implementation ready]
         │
         ▼
 ┌──────────────────┐    PLAN_READY
@@ -183,27 +181,27 @@ specs/<id>-<slug>/
         │
         ▼
 ┌──────────────────┐    ALL_PASS
-│  test-runner     │──────────────►  ciclo encerrado ✅
+│  test-runner     │──────────────►  cycle ended
 │                  │
 │                  │    FAILURES_DETECTED
 └──────┬───────────┘──────────────►  test-results.md
        │
        │  EXECUTION_ERROR
-       └──────────────────────────►  escalar 🚨
+       └──────────────────────────►  escalate
        │
        ▼
 ┌──────────────────┐    NO_BUGS
-│  bug-reporter    │──────────────►  anomalia 🚨
+│  bug-reporter    │──────────────►  anomaly
 │                  │
 │                  │    BUGS_TO_FIX
 └──────┬───────────┘──────────────►  bug-report.md
        │
        │  ESCALATE_TO_HUMAN
-       └──────────────────────────►  escalar 🚨
+       └──────────────────────────►  escalate
        │
        ▼
 ┌──────────────────┐
-│  bug-fixer       │──────────────►  fix-log.md + PR aberto
+│  bug-fixer       │──────────────►  fix-log.md + open PR
 └──────┬───────────┘                       │
        │                                   │
        │  loop ≤ 3                         │
@@ -216,44 +214,44 @@ specs/<id>-<slug>/
                  └──────────┘
                        │
                        ▼
-                 ciclo encerrado ✅
+                 cycle ended
 ```
 
-## Gates explícitos
+## Explicit gates
 
-| De → Para | Condição para avançar |
+| From → To | Condition to advance |
 |---|---|
-| planner → runner | `test-plan.md` existe e tem casos P0 |
-| runner → reporter | veredito = `FAILURES_DETECTED` |
-| runner → fim | veredito = `ALL_PASS` |
-| reporter → fixer | veredito = `BUGS_TO_FIX` |
-| fixer → runner (re-run) | ao menos 1 bug com status `FIXED` no fix-log |
-| qualquer → escalar | erro de execução, ambiguidade de spec, regressão nova, ou 3 iterações sem convergir |
+| planner → runner | `test-plan.md` exists and has P0 cases |
+| runner → reporter | verdict = `FAILURES_DETECTED` |
+| runner → end | verdict = `ALL_PASS` |
+| reporter → fixer | verdict = `BUGS_TO_FIX` |
+| fixer → runner (re-run) | at least 1 bug with status `FIXED` in fix-log |
+| any → escalate | execution error, spec ambiguity, new regression, or 3 iterations without convergence |
 
-## Anti-padrões neste ciclo
+## Anti-patterns in this cycle
 
-- **Não pule o planner.** Sem plano, o runner não tem o que executar e o bug-reporter não tem rastreabilidade.
-- **Não combine agentes.** Cada um roda em contexto isolado para evitar contaminação (planner não deve ver o relatório, fixer não deve ver o plano original — só o bug-report).
-- **Não rode o ciclo sem branch.** Sempre em branch isolada (`fix/<spec-id>-qa-<ts>` é gerada pelo bug-fixer).
-- **Não esconda bugs escalados.** Se o ciclo termina com bugs `ESCALATED`, o PR descreve quais e o humano decide.
-- **Não silencie testes flaky.** O bug-reporter marca `flaky: true`; o bug-fixer **não pode** simplesmente colocar `t.Skip()`. Flaky vira bug rastreado.
+- **Do not skip the planner.** Without a plan, the runner has nothing to execute and the bug-reporter has no traceability.
+- **Do not combine agents.** Each runs in isolated context to avoid contamination (planner should not see the report, fixer should not see the original plan — only the bug-report).
+- **Do not run the cycle without a branch.** Always use an isolated branch (`fix/<spec-id>-qa-<ts>` is generated by the bug-fixer).
+- **Do not hide escalated bugs.** If the cycle ends with `ESCALATED` bugs, the PR describes which ones and the human decides.
+- **Do not silence flaky tests.** The bug-reporter marks `flaky: true`; the bug-fixer **cannot** simply add `t.Skip()`. Flaky becomes a tracked bug.
 
-## Quando NÃO usar este ciclo
+## When NOT to use this cycle
 
-- **Spike / protótipo** sem spec: não rode o ciclo, ele depende da spec como oracle.
-- **Mudança apenas de docs / ADR**: nada para testar.
-- **Hotfix urgente**: rode o `bug-fixer` direto a partir de um `bug-report.md` escrito à mão (pelo humano), pulando planner e runner. Documente no commit.
+- **Spike / prototype** without a spec: do not run the cycle; it depends on the spec as oracle.
+- **Docs-only / ADR change**: nothing to test.
+- **Urgent hotfix**: run `bug-fixer` directly from a hand-written `bug-report.md` (by the human), skipping planner and runner. Document it in the commit.
 
-## Comandos resumidos
+## Summary commands
 
 ```bash
-# Rodar o ciclo manualmente, passo a passo
+# Run the cycle manually, step by step
 /spawn test-planner specs/0001-health-check
 /spawn test-runner  specs/0001-health-check
 /spawn bug-reporter specs/0001-health-check
 /spawn bug-fixer    specs/0001-health-check MIN_SEVERITY=low
 
-# Re-verificação
+# Re-verification
 /spawn test-runner  specs/0001-health-check
 /spawn reviewer     PR_BASE=main PR_HEAD=$(git branch --show-current) SPEC_PATH=specs/0001-health-check
 /spawn spec-verifier specs/0001-health-check
@@ -262,6 +260,6 @@ specs/<id>-<slug>/
 ## Reference
 
 - Subagents: `.agent/agents/{test-planner,test-runner,bug-reporter,bug-fixer}.md`
-- Subagents relacionados: `.agent/agents/{reviewer,spec-verifier,security-auditor}.md`
-- Rules aplicáveis: `.agent/rules/30-testing.md` (pirâmide), `99-forbidden.md` (limites do fixer)
-- Constituição: `.agent/CONSTITUTION.md` (workflow obrigatório)
+- Related subagents: `.agent/agents/{reviewer,spec-verifier,security-auditor}.md`
+- Applicable rules: `.agent/rules/30-testing.md` (pyramid), `99-forbidden.md` (fixer limits)
+- Constitution: `.agent/CONSTITUTION.md` (mandatory workflow)
